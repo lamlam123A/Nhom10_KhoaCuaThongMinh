@@ -1,31 +1,34 @@
-#include <ESP8266WiFi.h>
-#include <ESP8266HTTPClient.h>
+// #include <NTPClient.h>
+
+#include <WiFi.h>
+#include <HTTPClient.h>
 #include <ArduinoJson.h>
-#include <WiFiUdp.h>
-#include <NTPClient.h>
-#include <ESP8266WebServer.h>
+#include <WebServer.h>
+#include "time.h"
 
 // WiFi configuration
-// const char* ssid = "TP-LINK_E308";
-// const char* password = "99990000";
-const char* ssid = "iPhonee";
-const char* password = "1234567890";
+const char* ssid = "TP-LINK_E308";
+const char* password = "99990000";
+// const char* ssid = "iPhonee";
+// const char* password = "1234567890";
 
 // API endpoint
-const char* API_URL = "http://172.20.10.7:8080/api/logs";
-const char* DEFAULT_KEY_URL = "http://172.20.10.7:8080/api/default_key";
-const char* VALID_CARD_ID_URL = "http://172.20.10.7:8080/api/valid_card_id";
-// const char* DOOR_CONTROL_URL = "http://172.20.10.7:8080/api/control-door";
+const char* API_URL = "http://192.168.136.103:8080/api/logs";
+const char* DEFAULT_KEY_URL = "http://192.168.136.103:8080/api/default_key";
+const char* VALID_CARD_ID_URL = "http://192.168.136.103:8080/api/valid_card_id";
+// const char* DOOR_CONTROL_URL = "http://192.168.136.103:8080/api/control-door";
 
-// NTP Client setup
-WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "pool.ntp.org");
+// Time configuration
+const char* ntpServer = "pool.ntp.org";
+const long gmtOffset_sec = 0;
+const int daylightOffset_sec = 0;
 
-ESP8266WebServer server(80);
+WebServer server(80);
 
 void setup() {
   Serial.begin(9600);
 
+  // Kết nối WiFi
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
@@ -34,8 +37,8 @@ void setup() {
   Serial.println("Đã kết nối WiFi!");
   Serial.print(WiFi.localIP());
 
-  timeClient.begin();
-  timeClient.setTimeOffset(0);
+  // Khởi tạo thời gian
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
 
   // Fetch initial values
   String defaultKey = getDefaultKey();
@@ -159,18 +162,18 @@ void handleArduinoCommand(const String& command) {
 
 
 String getCurrentTime() {
-  timeClient.update();
-  time_t epochTime = timeClient.getEpochTime();
-  struct tm* ptm = gmtime((time_t*)&epochTime);
-  char buffer[25];
-  strftime(buffer, 25, "%Y-%m-%dT%H:%M:%S.000Z", ptm);
-  return String(buffer);
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) {
+    return "";
+  }
+  char timeString[25];
+  strftime(timeString, 25, "%Y-%m-%dT%H:%M:%S.000Z", &timeinfo);
+  return String(timeString);
 }
 
 void sendAccessLog(const String& accessType, const String& accessResult) {
   if (WiFi.status() == WL_CONNECTED) {
     HTTPClient http;
-    WiFiClient client;
 
     StaticJsonDocument<200> doc;
     doc["accessType"] = accessType;
@@ -201,9 +204,8 @@ void sendAccessLog(const String& accessType, const String& accessResult) {
 String getDefaultKey() {
   if (WiFi.status() == WL_CONNECTED) {
     HTTPClient http;
-    WiFiClient client;
 
-    http.begin(client, DEFAULT_KEY_URL);
+    http.begin(DEFAULT_KEY_URL);
     int httpResponseCode = http.GET();
 
     if (httpResponseCode > 0) {
@@ -221,9 +223,8 @@ String getDefaultKey() {
 String getValidCardId() {
   if (WiFi.status() == WL_CONNECTED) {
     HTTPClient http;
-    WiFiClient client;
 
-    http.begin(client, VALID_CARD_ID_URL);
+    http.begin(VALID_CARD_ID_URL);
     int httpResponseCode = http.GET();
 
     if (httpResponseCode > 0) {
