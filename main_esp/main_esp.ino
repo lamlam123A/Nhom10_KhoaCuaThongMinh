@@ -1,10 +1,28 @@
-// #include <NTPClient.h>
-
 #include <WiFi.h>
+#include <WebServer.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
-#include <WebServer.h>
+#include "esp_camera.h"
+#include "esp_http_server.h"
 #include "time.h"
+
+// Camera pins for AI Thinker ESP32-CAM
+#define PWDN_GPIO_NUM 32
+#define RESET_GPIO_NUM -1
+#define XCLK_GPIO_NUM 0
+#define SIOD_GPIO_NUM 26
+#define SIOC_GPIO_NUM 27
+#define Y9_GPIO_NUM 35
+#define Y8_GPIO_NUM 34
+#define Y7_GPIO_NUM 39
+#define Y6_GPIO_NUM 36
+#define Y5_GPIO_NUM 21
+#define Y4_GPIO_NUM 19
+#define Y3_GPIO_NUM 18
+#define Y2_GPIO_NUM 5
+#define VSYNC_GPIO_NUM 25
+#define HREF_GPIO_NUM 23
+#define PCLK_GPIO_NUM 22
 
 // WiFi configuration
 const char* ssid = "TP-LINK_E308";
@@ -28,30 +46,35 @@ WebServer server(80);
 void setup() {
   Serial.begin(9600);
 
-  // Kết nối WiFi
+  // Connect to WiFi
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
     Serial.print(".");
   }
-  Serial.println("Đã kết nối WiFi!");
-  Serial.print(WiFi.localIP());
+  Serial.println("Connected to WiFi!");
+  Serial.println(WiFi.localIP());
 
-  // Khởi tạo thời gian
+  // Initialize camera
+  setupCamera();
+
+  // Initialize time
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
 
-  // Fetch initial values
+  // Setup web server routes
+  server.on("/", HTTP_GET, handleRoot);
+  server.on("/stream", HTTP_GET, handleStream);
+  server.on("/control-door", HTTP_POST, handleDoorControl);
+
+  server.begin();
+  Serial.println("HTTP server started");
+
+  // Fetch and send initial values
   String defaultKey = getDefaultKey();
   String validCardId = getValidCardId();
-
-  // Send initial values to Arduino
   Serial.println("CMD:UPDATE_KEY:" + defaultKey);
   delay(1000);
   Serial.println("CMD:UPDATE_CARD:" + validCardId);
-
-  server.on("/control-door", HTTP_POST, handleDoorControl);
-  server.begin();
-  Serial.println("HTTP server started");
 }
 
 void loop() {
@@ -64,72 +87,7 @@ void loop() {
   }
 }
 
-// void handleArduinoCommand(const String& command) {
-//   if (command == "GET_DEFAULT_KEY") {
-//     String defaultKey = getDefaultKey();
-//     Serial.println("CMD:UPDATE_KEY:" + defaultKey);
-//   } else if (command == "GET_VALID_CARD_ID") {
-//     String validCardId = getValidCardId();
-//     Serial.println("CMD:UPDATE_CARD:" + validCardId);
-//   } else {
-//     // Tách command thành loại truy cập và kết quả
-//     int colonIndex = command.indexOf(':');
-//     if (colonIndex != -1) {
-//       String commandType = command.substring(0, colonIndex);
-//       String accessResult = command.substring(colonIndex + 1);
-
-//       Serial.println("Command Type: " + commandType);    // In ra để debug
-//       Serial.println("Access Result: " + accessResult);  // In ra để debug
-
-//       String accessType = "";
-//       if (commandType == "LOG_KEYPAD") {
-//         accessType = "KEYPAD";
-//       } else if (commandType == "LOG_RFID") {
-//         accessType = "RFID";
-//       }
-
-//       if (!accessType.isEmpty()) {
-//         sendAccessLog(accessType, accessResult);
-//       }
-//     }
-//   }
-// }
-
 void handleArduinoCommand(const String& command) {
-  // if (command == "GET_DEFAULT_KEY") {
-  //   String defaultKey = getDefaultKey();
-  //   Serial.println("CMD:UPDATE_KEY:" + defaultKey);
-  // } else if (command == "GET_VALID_CARD_ID") {
-  //   String validCardId = getValidCardId();
-  //   Serial.println("CMD:UPDATE_CARD:" + validCardId);
-  // } else if (command == "OPEN_DOOR") {
-  //   handleDoorControl(true);
-  // } else if (command == "CLOSE_DOOR") {
-  //   handleDoorControl(false);
-  // } else if (command.startsWith("LOG_")) {
-  //   // Tách command thành loại truy cập và kết quả
-  //   int colonIndex = command.indexOf(':');
-  //   if (colonIndex != -1) {
-  //     String commandType = command.substring(0, colonIndex);
-  //     String accessResult = command.substring(colonIndex + 1);
-
-  //     Serial.println("Command Type: " + commandType);    // In ra để debug
-  //     Serial.println("Access Result: " + accessResult);  // In ra để debug
-
-  //     String accessType = "";
-  //     if (commandType == "LOG_KEYPAD") {
-  //       accessType = "KEYPAD";
-  //     } else if (commandType == "LOG_RFID") {
-  //       accessType = "RFID";
-  //     }
-
-  //     if (!accessType.isEmpty()) {
-  //       sendAccessLog(accessType, accessResult);
-  //     }
-  //   }
-  // }
-
-
   if (command == "GET_DEFAULT_KEY") {
     String defaultKey = getDefaultKey();
     Serial.println("CMD:UPDATE_KEY:" + defaultKey);
@@ -182,16 +140,15 @@ void sendAccessLog(const String& accessType, const String& accessResult) {
 
     String jsonString;
     serializeJson(doc, jsonString);
-    Serial.println("Sending JSON: " + jsonString);  // In ra để debug
+    Serial.println("Sending JSON: " + jsonString);
 
-    http.begin(client, API_URL);
+    http.begin(API_URL);
     http.addHeader("Content-Type", "application/json");
 
     int httpResponseCode = http.POST(jsonString);
 
     if (httpResponseCode > 0) {
       String response = http.getString();
-      // Serial.println(response);
       Serial.println("CMD:SUCCESS");
     } else {
       Serial.println("CMD:FAILED");
@@ -239,33 +196,7 @@ String getValidCardId() {
   return "";
 }
 
-// void handleDoorControl(bool isOpen) {
-//   if (WiFi.status() == WL_CONNECTED) {
-//     HTTPClient http;
-//     WiFiClient client;
 
-//     StaticJsonDocument<200> doc;
-//     doc["isOpen"] = isOpen;
-
-//     String jsonString;
-//     serializeJson(doc, jsonString);
-//     Serial.println("Sending JSON: " + jsonString);  // In ra để debug
-
-//     http.begin(client, DOOR_CONTROL_URL);
-//     http.addHeader("Content-Type", "application/json");
-
-//     int httpResponseCode = http.POST(jsonString);
-
-//     if (httpResponseCode > 0) {
-//       String response = http.getString();
-//       Serial.println("CMD:" + String(isOpen ? "OPEN_DOOR" : "CLOSE_DOOR"));
-//     } else {
-//       Serial.println("CMD:FAILED");
-//     }
-
-//     http.end();
-//   }
-// }
 
 void handleDoorControl() {
   String message;
@@ -285,5 +216,127 @@ void handleDoorControl() {
     }
   } else {
     server.send(400, "application/json", "{\"success\":false,\"error\":\"No data received\"}");
+  }
+}
+
+
+void setupCamera() {
+  camera_config_t config;
+  config.ledc_channel = LEDC_CHANNEL_0;
+  config.ledc_timer = LEDC_TIMER_0;
+  config.pin_d0 = Y2_GPIO_NUM;
+  config.pin_d1 = Y3_GPIO_NUM;
+  config.pin_d2 = Y4_GPIO_NUM;
+  config.pin_d3 = Y5_GPIO_NUM;
+  config.pin_d4 = Y6_GPIO_NUM;
+  config.pin_d5 = Y7_GPIO_NUM;
+  config.pin_d6 = Y8_GPIO_NUM;
+  config.pin_d7 = Y9_GPIO_NUM;
+  config.pin_xclk = XCLK_GPIO_NUM;
+  config.pin_pclk = PCLK_GPIO_NUM;
+  config.pin_vsync = VSYNC_GPIO_NUM;
+  config.pin_href = HREF_GPIO_NUM;
+  config.pin_sscb_sda = SIOD_GPIO_NUM;
+  config.pin_sscb_scl = SIOC_GPIO_NUM;
+  config.pin_pwdn = PWDN_GPIO_NUM;
+  config.pin_reset = RESET_GPIO_NUM;
+  config.xclk_freq_hz = 20000000;
+  config.pixel_format = PIXFORMAT_JPEG;
+
+  // Initial settings
+  config.frame_size = FRAMESIZE_VGA;
+  config.jpeg_quality = 10;  // 0-63, lower means higher quality
+  config.fb_count = 2;
+
+  // Camera init
+  esp_err_t err = esp_camera_init(&config);
+  if (err != ESP_OK) {
+    Serial.printf("Camera init failed with error 0x%x", err);
+    return;
+  }
+
+  sensor_t* s = esp_camera_sensor_get();
+  s->set_brightness(s, 0);                  // -2 to 2
+  s->set_contrast(s, 0);                    // -2 to 2
+  s->set_saturation(s, 0);                  // -2 to 2
+  s->set_special_effect(s, 0);              // 0 = No Effect, 1 = Negative, 2 = Grayscale, 3 = Red Tint, 4 = Green Tint, 5 = Blue Tint, 6 = Sepia
+  s->set_whitebal(s, 1);                    // 0 = disable , 1 = enable
+  s->set_awb_gain(s, 1);                    // 0 = disable , 1 = enable
+  s->set_wb_mode(s, 0);                     // 0 to 4 - if awb_gain enabled (0 - Auto, 1 - Sunny, 2 - Cloudy, 3 - Office, 4 - Home)
+  s->set_exposure_ctrl(s, 1);               // 0 = disable , 1 = enable
+  s->set_aec2(s, 0);                        // 0 = disable , 1 = enable
+  s->set_gain_ctrl(s, 1);                   // 0 = disable , 1 = enable
+  s->set_agc_gain(s, 0);                    // 0 to 30
+  s->set_gainceiling(s, (gainceiling_t)0);  // 0 to 6
+  s->set_bpc(s, 0);                         // 0 = disable , 1 = enable
+  s->set_wpc(s, 1);                         // 0 = disable , 1 = enable
+  s->set_raw_gma(s, 1);                     // 0 = disable , 1 = enable
+  s->set_lenc(s, 1);                        // 0 = disable , 1 = enable
+  s->set_hmirror(s, 0);                     // 0 = disable , 1 = enable
+  s->set_vflip(s, 0);                       // 0 = disable , 1 = enable
+  s->set_dcw(s, 1);                         // 0 = disable , 1 = enable
+  s->set_colorbar(s, 0);                    // 0 = disable , 1 = enable
+}
+
+void handleRoot() {
+  String html = "<html><head>";
+  html += "<title>ESP32-CAM Video Stream</title>";
+  html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
+  html += "<style>";
+  html += "body { font-family: Arial, sans-serif; text-align: center; margin: 0; padding: 20px; }";
+  html += ".container { max-width: 800px; margin: 0 auto; }";
+  html += ".video-container { position: relative; width: 100%; max-width: 640px; margin: 20px auto; }";
+  html += ".controls { margin: 20px 0; }";
+  html += "button { padding: 10px 20px; margin: 0 10px; cursor: pointer; }";
+  html += "#stream { width: 100%; max-width: 640px; height: auto; }";
+  html += "</style>";
+  html += "</head><body>";
+  html += "<div class='container'>";
+  html += "<h1>ESP32-CAM Video Stream</h1>";
+  html += "<div class='video-container'>";
+  html += "<img id='stream' src='/stream' />";
+  html += "</div>";
+  html += "<div class='controls'>";
+  html += "<button onclick='toggleDoor(true)'>Open Door</button>";
+  html += "<button onclick='toggleDoor(false)'>Close Door</button>";
+  html += "</div>";
+  html += "</div>";
+  html += "<script>";
+  html += "function toggleDoor(isOpen) {";
+  html += "  fetch('/control-door', {";
+  html += "    method: 'POST',";
+  html += "    headers: { 'Content-Type': 'application/json' },";
+  html += "    body: JSON.stringify({ isOpen: isOpen })";
+  html += "  });";
+  html += "}";
+  html += "</script>";
+  html += "</body></html>";
+  server.send(200, "text/html", html);
+}
+
+void handleStream() {
+  WiFiClient client = server.client();
+
+  String response = "HTTP/1.1 200 OK\r\n";
+  response += "Content-Type: multipart/x-mixed-replace; boundary=frame\r\n\r\n";
+  client.print(response);
+
+  while (client.connected()) {
+    camera_fb_t* fb = esp_camera_fb_get();
+    if (!fb) {
+      Serial.println("Camera capture failed");
+      delay(1000);
+      continue;
+    }
+
+    String header = "--frame\r\n";
+    header += "Content-Type: image/jpeg\r\n";
+    header += "Content-Length: " + String(fb->len) + "\r\n\r\n";
+    client.print(header);
+    client.write(fb->buf, fb->len);
+    client.print("\r\n");
+
+    esp_camera_fb_return(fb);
+    delay(10);  // Slight delay to prevent overwhelming the client
   }
 }
