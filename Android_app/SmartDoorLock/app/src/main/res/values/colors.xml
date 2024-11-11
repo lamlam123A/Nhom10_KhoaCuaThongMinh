@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Primary Colors -->
+    <color name="primary">#3F51B5</color> <!-- Màu xanh dương nhạt -->
+    <color name="primary_dark">#303F9F</color> <!-- Màu xanh dương đậm -->
+    <color name="primary_light">#C5CAE9</color> <!-- Màu xanh dương nhạt nhẹ hơn -->
+
+    <!-- Secondary Colors -->
+    <color name="secondary">#FF9800</color> <!-- Màu cam nổi bật -->
+    <color name="secondary_dark">#F57C00</color> <!-- Màu cam đậm -->
+    <color name="secondary_light">#FFE0B2</color> <!-- Màu cam nhạt nhẹ hơn -->
+
+    <!-- Neutral Colors -->
+    <color name="gray">#9E9E9E</color> <!-- Màu xám trung tính -->
+    <color name="light_gray">#F5F5F5</color> <!-- Màu xám nhạt -->
+
+    <!-- Accent Colors -->
+    <color name="accent">#4CAF50</color> <!-- Màu xanh lá cây tươi sáng -->
+    <color name="error">#F44336</color> <!-- Màu đỏ cho lỗi -->
+
+    <!-- Custom Colors -->
+    <color name="custom_blue">#1E88E5</color> <!-- Màu xanh biển -->
+    <color name="custom_purple">#7E57C2</color> <!-- Màu tím dịu -->
+    <color name="custom_pink">#EC407A</color> <!-- Màu hồng nhẹ nhàng -->
+    <color name="custom_green">#66BB6A</color> <!-- Màu xanh lá cây mềm mại -->
+
+    <color name="purple_200">#BB86FC</color>
+    <color name="purple_500">#6200EE</color>
+    <color name="purple_700">#3700B3</color>
+    <color name="teal_200">#03DAC5</color>
+    <color name="teal_700">#018786</color>
+    <color name="black">#000000</color>
+    <color name="white">#FFFFFF</color>
+    <color name="lavender">#8692F7</color>
+    <color name="my_color">#FF0000</color>
+    <color name="green">#4fa853</color>
+</resources>

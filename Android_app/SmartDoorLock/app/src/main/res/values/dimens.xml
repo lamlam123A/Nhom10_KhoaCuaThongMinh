@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="nav_header_vertical_spacing">16dp</dimen>
+    <dimen name="nav_header_image_top_margin">24dp</dimen>
+    <dimen name="nav_header_image_size">64dp</dimen>
+    <dimen name="nav_header_title_margin_top">16dp</dimen>
+</resources>

@@ -66,7 +66,8 @@ public class DoorAccessService {
 	    try {
 	        // Thay đổi URL này thành địa chỉ IP của ESP8266
 //	        URL url = new URL("http://192.168.136.110/control-door"); // ip esp8266
-	    	URL url = new URL("http://172.20.10.4/control-door"); // ip esp8266	
+//	    	http://192.168.136.116/
+	    	URL url = new URL("http://192.168.136.116/control-door"); // ip esp32
 	        HttpURLConnection con = (HttpURLConnection) url.openConnection();
 	        con.setRequestMethod("POST");
 	        con.setRequestProperty("Content-Type", "application/json");

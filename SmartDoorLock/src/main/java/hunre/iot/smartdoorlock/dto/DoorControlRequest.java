@@ -7,7 +7,7 @@ public class DoorControlRequest {
         return isOpen;
     }
 
-    public void setIsOpen(boolean isOpen) {  // Sửa thành setIsOpen
+    public void setIsOpen(boolean isOpen) {
         this.isOpen = isOpen;
     }
 }

@@ -28,7 +28,7 @@
 const char* ssid = "TP-LINK_E308";
 const char* password = "99990000";
 // const char* ssid = "iPhonee";
-// const char* password = "1234567890";
+// const char* password = "123123123";
 
 // API endpoint
 const char* API_URL = "http://192.168.136.103:8080/api/logs";
@@ -45,6 +45,42 @@ WebServer server(80);
 
 void setup() {
   Serial.begin(9600);
+  delay(3000);
+
+  // Serial.println("\nStarting WiFi connection...");
+  // Serial.printf("Connecting to SSID: %s\n", ssid);
+
+  // WiFi.mode(WIFI_STA); // Set WiFi to station mode
+  // WiFi.begin(ssid, password);
+
+  // int attempt = 0;
+  // while (WiFi.status() != WL_CONNECTED && attempt < 20) { // Timeout after 20 attempts
+  //   delay(1000);
+  //   Serial.printf("Attempt %d: WiFi status = %d\n", attempt + 1, WiFi.status());
+  //   Serial.print(".");
+  //   attempt++;
+  // }
+
+  // if (WiFi.status() == WL_CONNECTED) {
+  //   Serial.println("\nWiFi Connected!");
+  //   Serial.print("Local IP Address: ");
+  //   Serial.println(WiFi.localIP());
+  //   Serial.print("Signal Strength (RSSI): ");
+  //   Serial.print(WiFi.RSSI());
+  //   Serial.println(" dBm");
+  // } else {
+  //   Serial.println("\nWiFi Connection Failed!");
+  //   Serial.println("Error Status: ");
+  //   switch(WiFi.status()) {
+  //     case WL_IDLE_STATUS: Serial.println("Idle"); break;
+  //     case WL_NO_SSID_AVAIL: Serial.println("SSID not available"); break;
+  //     case WL_CONNECT_FAILED: Serial.println("Connection Failed"); break;
+  //     case WL_CONNECTION_LOST: Serial.println("Connection Lost"); break;
+  //     case WL_DISCONNECTED: Serial.println("Disconnected"); break;
+  //     default: Serial.printf("Unknown Status: %d\n", WiFi.status());
+  //   }
+  // }
+
 
   // Connect to WiFi
   WiFi.begin(ssid, password);
@@ -98,26 +134,36 @@ void handleArduinoCommand(const String& command) {
     // Tách command thành loại truy cập và kết quả
     int colonIndex = command.indexOf(':');
     if (colonIndex != -1) {
+      // String commandType = command.substring(0, colonIndex);
+      // String accessResult = command.substring(colonIndex + 1);
+
+      // Serial.println("Command Type: " + commandType);    // In ra để debug
+      // Serial.println("Access Result: " + accessResult);  // In ra để debug
+
       String commandType = command.substring(0, colonIndex);
-      String accessResult = command.substring(colonIndex + 1);
+      int secondColonIndex = command.indexOf(':', colonIndex + 1);
+      if (secondColonIndex != -1) {
+        String accessResult = command.substring(colonIndex + 1, secondColonIndex);
+        String doorStatus = command.substring(secondColonIndex + 1);
 
-      Serial.println("Command Type: " + commandType);    // In ra để debug
-      Serial.println("Access Result: " + accessResult);  // In ra để debug
+        Serial.println("Command Type: " + commandType);
+        Serial.println("Access Result: " + accessResult);
+        Serial.println("Door Status: " + doorStatus);
 
-      String accessType = "";
-      if (commandType == "LOG_KEYPAD") {
-        accessType = "KEYPAD";
-      } else if (commandType == "LOG_RFID") {
-        accessType = "RFID";
-      }
+        String accessType = "";
+        if (commandType == "LOG_KEYPAD") {
+          accessType = "KEYPAD";
+        } else if (commandType == "LOG_RFID") {
+          accessType = "RFID";
+        }
 
-      if (!accessType.isEmpty()) {
-        sendAccessLog(accessType, accessResult);
+        if (!accessType.isEmpty()) {
+          sendAccessLog(accessType, accessResult, doorStatus);
+        }
       }
     }
   }
 }
-
 
 String getCurrentTime() {
   struct tm timeinfo;
@@ -129,12 +175,13 @@ String getCurrentTime() {
   return String(timeString);
 }
 
-void sendAccessLog(const String& accessType, const String& accessResult) {
+void sendAccessLog(const String& accessType, const String& accessResult, const String& doorStatus) {
   if (WiFi.status() == WL_CONNECTED) {
     HTTPClient http;
 
     StaticJsonDocument<200> doc;
     doc["accessType"] = accessType;
+    doc["doorStatus"] = doorStatus;
     doc["accessResult"] = accessResult;
     doc["accessTime"] = getCurrentTime();
 
@@ -209,9 +256,11 @@ void handleDoorControl() {
 
     if (isOpen) {
       Serial.println("CMD:OPEN_DOOR");
+      sendAccessLog("APP", "GRANTED", "OPEN");
       server.send(200, "application/json", "{\"success\":true,\"message\":\"Door opened\"}");
     } else {
       Serial.println("CMD:CLOSE_DOOR");
+      sendAccessLog("APP", "GRANTED", "CLOSED");
       server.send(200, "application/json", "{\"success\":true,\"message\":\"Door closed\"}");
     }
   } else {
@@ -245,7 +294,8 @@ void setupCamera() {
 
   // Initial settings
   config.frame_size = FRAMESIZE_VGA;
-  config.jpeg_quality = 10;  // 0-63, lower means higher quality
+  // config.jpeg_quality = 10;  // 0-63, lower means higher quality
+  config.jpeg_quality = 30;  // 0-63, với 0 là chất lượng thấp nhất, 63 là cao nhất
   config.fb_count = 2;
 
   // Camera init
@@ -283,12 +333,10 @@ void handleRoot() {
   html += "<title>ESP32-CAM Video Stream</title>";
   html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
   html += "<style>";
-  html += "body { font-family: Arial, sans-serif; text-align: center; margin: 0; padding: 20px; }";
+  html += "body { font-family: Arial, sans-serif; text-align: center; margin: 0; padding: 20px; background-color: #f0f0f0; }";
   html += ".container { max-width: 800px; margin: 0 auto; }";
   html += ".video-container { position: relative; width: 100%; max-width: 640px; margin: 20px auto; }";
-  html += ".controls { margin: 20px 0; }";
-  html += "button { padding: 10px 20px; margin: 0 10px; cursor: pointer; }";
-  html += "#stream { width: 100%; max-width: 640px; height: auto; }";
+  html += "#stream { width: 100%; max-width: 640px; height: auto; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }";
   html += "</style>";
   html += "</head><body>";
   html += "<div class='container'>";
@@ -296,20 +344,7 @@ void handleRoot() {
   html += "<div class='video-container'>";
   html += "<img id='stream' src='/stream' />";
   html += "</div>";
-  html += "<div class='controls'>";
-  html += "<button onclick='toggleDoor(true)'>Open Door</button>";
-  html += "<button onclick='toggleDoor(false)'>Close Door</button>";
   html += "</div>";
-  html += "</div>";
-  html += "<script>";
-  html += "function toggleDoor(isOpen) {";
-  html += "  fetch('/control-door', {";
-  html += "    method: 'POST',";
-  html += "    headers: { 'Content-Type': 'application/json' },";
-  html += "    body: JSON.stringify({ isOpen: isOpen })";
-  html += "  });";
-  html += "}";
-  html += "</script>";
   html += "</body></html>";
   server.send(200, "text/html", html);
 }

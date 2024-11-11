@@ -352,10 +352,13 @@ String getRFIDUID() {
 
 // Ghi log truy cập
 void logAccess(bool isKeypadAuth, bool isGranted) {
-  Serial.println(String("LOG_") + (isKeypadAuth ? "KEYPAD:" : "RFID:") + (isGranted ? "GRANTED" : "DENIED"));
-  // String accessType = isKeypadAuth ? "KEYPAD" : "RFID";
-  // String accessResult = isGranted ? "GRANTED" : "DENIED";
-  // Serial.println("LOG_" + accessType + ":" + accessResult);
+  // Serial.println(String("LOG_") + (isKeypadAuth ? "KEYPAD:" : "RFID:") + (isGranted ? "GRANTED" : "DENIED"));
+
+  String accessType = isKeypadAuth ? "KEYPAD" : "RFID";
+  String accessResult = isGranted ? "GRANTED" : "DENIED";
+  String doorStatus = isDoorOpen ? "OPEN" : "CLOSED";
+  Serial.println("LOG_" + accessType + ":" + accessResult + ":" + doorStatus);
+  
 }
 
 // Kiểm tra cập nhật từ ESP8266
